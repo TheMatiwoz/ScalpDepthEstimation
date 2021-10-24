@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
+import tools
 
 
 class UNet(nn.Module):
@@ -89,3 +91,18 @@ class OutConv(nn.Module):
 
     def forward(self, x):
         return self.conv(x)
+
+
+class WarpingLayer(nn.Module):
+    def __init__(self, f, B, epsilon=1.0e-8):
+        super().__init__()
+        self.B = B
+        self.f = f
+        self.epsilon = epsilon
+
+    def forward(self, x):
+        i2, d = x
+        D = np.zeros(d.shape, dtype=np.uint8) + self.f * self.B
+        D = np.divide(D, d + self.epsilon)
+        return tools.inverse_warping.warp(i2, D)
+
