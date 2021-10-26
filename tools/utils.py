@@ -1,5 +1,6 @@
-from pathlib import Path
 
+import math
+import matplotlib.pyplot as plt
 
 def get_color_file_names_by_bag(root, training_patient_id, validation_patient_id, testing_patient_id):
     training_image_list = []
@@ -34,3 +35,13 @@ def get_parent_folder_names(root, id_range):
     folder_list.sort()
     return folder_list
 
+
+def distance(x1, y1, x2, y2):
+    return math.sqrt((x2-x1)**2 + (y2-y1)**2)
+
+
+# print(distance(1.69877,1.10727,1.69439,1.10135))
+# print(distance(-9.13142, -3.99888, -8.26979, -3.34355))
+img = plt.imread(r"D:\Programowanie\DL\Inzynierka\DepthEstimation\training_data\bag_1\_start_saki4\00000001.jpg")
+plt.imshow(img)
+plt.show()

@@ -35,7 +35,7 @@ class UNet(nn.Module):
         return x
 
 
-class ConvX2(nn.module):
+class ConvX2(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.conv_2d = nn.Sequential(
@@ -64,7 +64,7 @@ class Down(nn.Module):
         return self.down(x)
 
 
-class Up(nn.module):
+class Up(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
 
