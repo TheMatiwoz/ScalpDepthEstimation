@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import tools
-
+from tools import inverse_warping
 
 class UNet(nn.Module):
     def __init__(self, n_channels):
@@ -102,7 +101,9 @@ class WarpingLayer(nn.Module):
 
     def forward(self, x):
         i2, d = x
-        D = np.zeros(d.shape, dtype=np.uint8) + self.f * self.B
-        D = np.divide(D, d + self.epsilon)
-        return tools.inverse_warping.warp(i2, D)
+        D = np.zeros(d.shape) + self.f * self.B
+        D = torch.from_numpy(D).to(self.device)
+        print(D.shape, d.shape)
+        D = torch.divide(D, d + self.epsilon)
+        return inverse_warping.warp(i2, D)
 

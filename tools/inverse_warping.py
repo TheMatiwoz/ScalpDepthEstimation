@@ -1,5 +1,6 @@
 import math
 
+import torch
 from PIL import Image
 from matplotlib.image import imread
 import matplotlib.pyplot as plt
@@ -11,20 +12,23 @@ def clamp(value, minimum, maximum):
 
 
 def warp(image, D):
-    result = np.zeros(image.shape, dtype=np.uint8)
+    result = torch.zeros(image.shape, requires_grad=True).to('cuda')
 
-    for h in range(image.shape[0]):
-        for w in range(image.shape[1]):
+    for b in range(D.shape[0]):
+        for h in range(D.shape[-2]):
+            for w in range(D.shape[-1]):
 
-            x_pixel = clamp((w - D[h, w]), 0, image.shape[1] - 1)
+                x_pixel = clamp((w - D[b, :, h, w]), 0, image.shape[-1] - 1)
 
-            result[h, w] = image[h, int(x_pixel)]
+                result[b, :, h, w] = image[b, :, h, int(x_pixel)]
     return result
 
 
 # image = imread(r"D:\Programowanie\DL\Inzynierka\DenseNet.jpg")
-# D = np.random.randint(10, 50, image.shape[:2], dtype=np.uint8)
+# image = torch.rand((4,3,5,5))
+# D = torch.rand((4,1,5,5))
 # im_out = warp(image, D)
+# print(im_out)
 # plt.imshow(im_out, interpolation='nearest')
 # plt.show()
 # im = Image.fromarray(im_out)
