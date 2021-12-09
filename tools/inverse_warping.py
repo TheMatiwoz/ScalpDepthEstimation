@@ -25,8 +25,10 @@ def warp(image, D):
 
 
 # image = imread(r"D:\Programowanie\DL\Inzynierka\DenseNet.jpg")
-# image = torch.rand((4,3,5,5))
-# D = torch.rand((4,1,5,5))
+image = torch.rand((4,3,5,5))
+D = torch.rand((4,1,3,3))
+out = torch.nn.functional.interpolate(D,size=image.shape[2:4], mode='bilinear')
+print(out.shape)
 # im_out = warp(image, D)
 # print(im_out)
 # plt.imshow(im_out, interpolation='nearest')

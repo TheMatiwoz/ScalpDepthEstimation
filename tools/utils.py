@@ -1,4 +1,4 @@
-
+import numpy as np
 import math
 import matplotlib.pyplot as plt
 
@@ -42,6 +42,11 @@ def distance(x1, y1, x2, y2):
 
 # print(distance(1.69877,1.10727,1.69439,1.10135))
 # print(distance(-9.13142, -3.99888, -8.26979, -3.34355))
-img = plt.imread(r"D:\Programowanie\DL\Inzynierka\DepthEstimation\training_data\bag_1\_start_saki4\00000001.jpg")
-plt.imshow(img)
-plt.show()
+# img = plt.imread(r"D:\Programowanie\DL\Inzynierka\DepthEstimation\training_data\bag_1\_start_saki4\00000001.jpg")
+# plt.imshow(img)
+# plt.show()
+
+# ar = np.ones((3,4))
+# print(ar)
+# print(-ar)
+
