@@ -90,10 +90,3 @@ class FCDenseNet(nn.Module):
 
         out = torch.abs(self.finalConv(out))
         return out
-
-
-def FCDenseNet57(n_classes):
-    return FCDenseNet(
-        in_channels=3, down_blocks=(4, 4, 4, 4, 4),
-        up_blocks=(4, 4, 4, 4, 4), bottleneck_layers=4,
-        growth_rate=12, out_chans_first_conv=48, n_classes=n_classes)
