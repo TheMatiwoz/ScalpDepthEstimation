@@ -31,7 +31,6 @@ if __name__ == '__main__':
                         help='interval range for a pair of video frames')
     parser.add_argument('--id_range', nargs='+', type=int, required=True,
                         help='id range for the training and testing dataset')
-    parser.add_argument('--network_downsampling', type=int, default=64, help='downsampling of network')
     parser.add_argument('--inlier_percentage', type=float, default=0.995,
                         help='percentage of inliers of SfM point clouds (for pruning some outliers)')
     parser.add_argument('--testing_patient_id', nargs='+', type=int, help='id of the testing patient')
@@ -63,11 +62,9 @@ if __name__ == '__main__':
     input_downsampling = args.input_downsampling
     batch_size = args.batch_size
     num_workers = args.num_workers
-    network_downsampling = args.network_downsampling
     inlier_percentage = args.inlier_percentage
     testing_patient_id = args.testing_patient_id
     load_intermediate_data = args.load_intermediate_data
-    is_hsv = args.use_hsv_colorspace
     display_architecture = args.architecture_summary
     selected_frame_index_list = args.selected_frame_index_list
     load_all_frames = args.load_all_frames
@@ -101,11 +98,10 @@ if __name__ == '__main__':
                                       folder_list=folder_list,
                                       adjacent_range=adjacent_range, transform=None,
                                       downsampling=input_downsampling,
-                                      network_downsampling=network_downsampling,
                                       inlier_percentage=inlier_percentage,
                                       use_store_data=load_intermediate_data,
                                       store_data_root=evaluation_data_root,
-                                      phase="test", is_hsv=is_hsv,
+                                      phase="test",
                                       num_pre_workers=num_pre_workers, visible_interval=visibility_overlap,
                                       rgb_mode="rgb")
 

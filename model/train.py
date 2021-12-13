@@ -91,7 +91,6 @@ if __name__ == '__main__':
     load_intermediate_data = args.load_intermediate_data
     load_trained_model = args.load_trained_model
     n_epochs = args.number_epoch
-    is_hsv = args.use_hsv_colorspace
     training_result_root = args.training_result_root
     display_architecture = args.architecture_summary
     trained_model_path = args.trained_model_path
