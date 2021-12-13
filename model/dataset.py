@@ -80,7 +80,7 @@ def pre_processing_data(folder_list, downsampling, inlier_percentage,
 
 class SfMDataset(Dataset):
     def __init__(self, image_file_names, folder_list, adjacent_range,
-                 downsampling, network_downsampling, inlier_percentage, visible_interval,
+                 downsampling, inlier_percentage, visible_interval,
                  store_data_root, phase, rgb_mode, num_iter=None):
         self.rgb_mode = rgb_mode
         self.image_file_names = image_file_names
@@ -89,7 +89,6 @@ class SfMDataset(Dataset):
         self.adjacent_range = adjacent_range
         self.inlier_percentage = inlier_percentage
         self.downsampling = downsampling
-        self.network_downsampling = network_downsampling
         self.phase = phase
         self.visible_interval = visible_interval
         self.num_iter = num_iter
@@ -110,10 +109,10 @@ class SfMDataset(Dataset):
 
         if phase == "Evaluation":
             precompute_path = store_data_root / ("evaluate_precompute_" + str(
-                self.downsampling) + "_" + str(self.network_downsampling) + "_" + str(self.inlier_percentage) + ".pkl")
+                self.downsampling) + "_" + str(self.inlier_percentage) + ".pkl")
         else:
             precompute_path = store_data_root / ("precompute_" + str(
-                self.downsampling) + "_" + str(self.network_downsampling) + "_" + str(self.inlier_percentage) + ".pkl")
+                self.downsampling) + "_" + str(self.inlier_percentage) + ".pkl")
 
         # Save all intermediate results to hard disk for quick access later on
         if not precompute_path.exists():

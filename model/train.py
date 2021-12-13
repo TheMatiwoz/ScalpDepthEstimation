@@ -75,14 +75,14 @@ if __name__ == '__main__':
 
     train_dataset = dataset.SfMDataset(image_file_names=train_filenames, folder_list=folder_list,
                                        adjacent_range=adjacent_range, downsampling=input_downsampling,
-                                       inlier_percentage=inlier_percentage,
-                                       visible_interval=visibility_overlap, store_data_root=training_data_root,
-                                       phase="train", rgb_mode="rgb", num_iter=num_iter)
+                                       inlier_percentage=inlier_percentage, visible_interval=visibility_overlap,
+                                       store_data_root=training_data_root, phase="train", rgb_mode="rgb",
+                                       num_iter=num_iter)
     validation_dataset = dataset.SfMDataset(image_file_names=val_filenames, folder_list=folder_list,
                                             adjacent_range=adjacent_range, downsampling=input_downsampling,
-                                            inlier_percentage=inlier_percentage,
-                                            visible_interval=visibility_overlap, store_data_root=training_data_root,
-                                            phase="validation", rgb_mode="rgb", num_iter=None)
+                                            inlier_percentage=inlier_percentage, visible_interval=visibility_overlap,
+                                            store_data_root=training_data_root, phase="validation", rgb_mode="rgb",
+                                            num_iter=None)
 
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     validation_loader = torch.utils.data.DataLoader(dataset=validation_dataset, batch_size=batch_size, shuffle=False,
