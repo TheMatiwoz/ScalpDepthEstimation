@@ -37,7 +37,6 @@ if __name__ == '__main__':
     parser.add_argument('--max_lr', type=float, default=1.0e-3, help='upper bound learning rate for cyclic lr')
     parser.add_argument('--min_lr', type=float, default=1.0e-4, help='lower bound learning rate for cyclic lr')
     parser.add_argument('--num_iter', type=int, default=1000, help='number of iterations per epoch')
-    parser.add_argument('--network_downsampling', type=int, default=64, help='network downsampling of the input image')
     parser.add_argument('--inlier_percentage', type=float, default=0.99,
                         help='percentage of inliers of SfM point clouds (for pruning some outliers)')
     parser.add_argument('--validation_interval', type=int, default=1, help='epoch interval for validation')
@@ -78,7 +77,6 @@ if __name__ == '__main__':
     max_lr = args.max_lr
     min_lr = args.min_lr
     num_iter = args.num_iter
-    network_downsampling = args.network_downsampling
     inlier_percentage = args.inlier_percentage
     validation_each = args.validation_interval
     depth_scaling_epsilon = args.zero_division_epsilon
