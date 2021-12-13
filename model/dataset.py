@@ -1,16 +1,17 @@
 import torch
 import numpy as np
 import cv2
-from multiprocessing import Queue
+import pickle
+from multiprocessing import Process, Queue
 
 from torch.utils.data import Dataset
 from albumentations.pytorch.functional import img_to_tensor
 import albumentations as albu
 
-from tools import utils
+import utils
 
 
-def pre_processing_data(folder_list, downsampling, inlier_percentage,
+def pre_processing_data(process_id, folder_list, downsampling, inlier_percentage,
                         visible_interval,
                         queue_clean_point_list, queue_intrinsic_matrix, queue_point_cloud,
                         queue_mask_boundary, queue_view_indexes_per_point, queue_selected_indexes,
@@ -19,12 +20,10 @@ def pre_processing_data(folder_list, downsampling, inlier_percentage,
     for folder in folder_list:
         folder_str = str(folder)
         undistorted_mask_boundary = cv2.imread(str(folder / "undistorted_mask.bmp"), cv2.IMREAD_GRAYSCALE)
-        # Downsample and crop the undistorted mask image
         cropped_downsampled_undistorted_mask_boundary, start_h, end_h, start_w, end_w = \
             utils.downsample_and_crop_mask(undistorted_mask_boundary, downsampling_factor=downsampling)
         queue_mask_boundary.put([folder_str, cropped_downsampled_undistorted_mask_boundary])
         queue_crop_positions.put([folder_str, [start_h, end_h, start_w, end_w]])
-        # Read selected image indexes and stride
         stride, selected_indexes = utils.read_selected_indexes(folder)
         queue_selected_indexes.put([folder_str, selected_indexes])
         # Read visible view indexes
@@ -33,19 +32,16 @@ def pre_processing_data(folder_list, downsampling, inlier_percentage,
         # Read undistorted camera intrinsics
         undistorted_camera_intrinsic_per_view = utils.read_camera_intrinsic_per_view(folder)
         # Downsample and crop the undistorted camera intrinsics
-        # Assuming for now that camera intrinsics within each clip remains the same
         cropped_downsampled_undistorted_intrinsic_matrix = utils.modify_camera_intrinsic_matrix(
             undistorted_camera_intrinsic_per_view[0], downsampling_factor=downsampling)
         queue_intrinsic_matrix.put([folder_str, cropped_downsampled_undistorted_intrinsic_matrix])
         # Read sparse point cloud from SfM
         point_cloud = utils.read_point_cloud(str(folder / "structure.ply"))
         queue_point_cloud.put([folder_str, point_cloud])
-        # self.point_cloud_per_seq[folder] = point_cloud
         # Read visible view indexes per point
         view_indexes_per_point = utils.read_view_indexes_per_point(folder, visible_view_indexes=
         visible_view_indexes, point_cloud_count=len(point_cloud))
-        # Update view_indexes_per_point_per_seq with neighborhood frames to increase stability and
-        # avoid as much occlusion problem as possible
+
         view_indexes_per_point = utils.overlapping_visible_view_indexes_per_point(view_indexes_per_point,
                                                                                   visible_interval)
         queue_view_indexes_per_point.put([folder_str, view_indexes_per_point])
@@ -59,38 +55,45 @@ def pre_processing_data(folder_list, downsampling, inlier_percentage,
                                                              visible_view_count=len(visible_view_indexes))
         queue_extrinsics.put([folder_str, visible_extrinsic_matrices])
         queue_projection.put([folder_str, visible_cropped_downsampled_undistorted_projection_matrices])
-        # Get approximate data global scale to reduce training data imbalance
+
         global_scale = utils.global_scale_estimation(visible_extrinsic_matrices, point_cloud)
         queue_estimated_scale.put([folder_str, global_scale])
         visible_cropped_downsampled_imgs = utils.get_color_imgs(folder, visible_view_indexes=visible_view_indexes,
                                                                 start_h=start_h, start_w=start_w,
                                                                 end_h=end_h, end_w=end_w,
                                                                 downsampling_factor=downsampling)
-        # Calculate contaminated point list
         clean_point_indicator_array \
-            = utils.get_clean_point_list(imgs=visible_cropped_downsampled_imgs, point_cloud=point_cloud,
-                                         view_indexes_per_point=view_indexes_per_point,
-                                         mask_boundary=cropped_downsampled_undistorted_mask_boundary,
+            = utils.get_clean_point_list(imgs=visible_cropped_downsampled_imgs,
+                                         point_cloud=point_cloud,
+                                         mask_boundary=
+                                         cropped_downsampled_undistorted_mask_boundary,
                                          inlier_percentage=inlier_percentage,
-                                         projection_matrices=visible_cropped_downsampled_undistorted_projection_matrices,
-                                         extrinsic_matrices=visible_extrinsic_matrices)
+                                         projection_matrices=
+                                         visible_cropped_downsampled_undistorted_projection_matrices,
+                                         extrinsic_matrices=visible_extrinsic_matrices,
+                                         view_indexes_per_point=view_indexes_per_point)
         queue_clean_point_list.put([folder_str, clean_point_indicator_array])
         print("sequence {} finished".format(folder_str))
+
+    print("{}th process finished".format(process_id))
 
 
 class SfMDataset(Dataset):
     def __init__(self, image_file_names, folder_list, adjacent_range,
-                 downsampling, inlier_percentage, visible_interval,
-                 store_data_root, phase, rgb_mode, num_iter=None):
+                 transform, downsampling, inlier_percentage, visible_interval,
+                 use_store_data, store_data_root, phase, num_pre_workers, rgb_mode, num_iter=None):
         self.rgb_mode = rgb_mode
         self.image_file_names = image_file_names
         self.folder_list = folder_list
+        self.transform = transform
         assert (len(adjacent_range) == 2)
         self.adjacent_range = adjacent_range
+        self.transform = transform
         self.inlier_percentage = inlier_percentage
         self.downsampling = downsampling
         self.phase = phase
         self.visible_interval = visible_interval
+        self.num_pre_workers = min(len(folder_list), num_pre_workers)
         self.num_iter = num_iter
         self.num_sample = len(self.image_file_names)
 
@@ -114,8 +117,7 @@ class SfMDataset(Dataset):
             precompute_path = store_data_root / ("precompute_" + str(
                 self.downsampling) + "_" + str(self.inlier_percentage) + ".pkl")
 
-        # Save all intermediate results to hard disk for quick access later on
-        if not precompute_path.exists():
+        if not use_store_data or not precompute_path.exists():
             queue_clean_point_list = Queue()
             queue_intrinsic_matrix = Queue()
             queue_point_cloud = Queue()
@@ -128,18 +130,68 @@ class SfMDataset(Dataset):
             queue_crop_positions = Queue()
             queue_estimated_scale = Queue()
 
+            interval = len(self.folder_list) / self.num_pre_workers
+
             print("Start pre-processing dataset...")
-            pre_processing_data(self.folder_list,
-                                self.downsampling,
-                                self.inlier_percentage, self.visible_interval,
-                                queue_clean_point_list,
-                                queue_intrinsic_matrix, queue_point_cloud,
-                                queue_mask_boundary, queue_view_indexes_per_point,
-                                queue_selected_indexes,
-                                queue_visible_view_indexes,
-                                queue_extrinsics, queue_projection,
-                                queue_crop_positions,
-                                queue_estimated_scale)
+            process_pool = []
+            for i in range(self.num_pre_workers):
+                process_pool.append(Process(target=pre_processing_data,
+                                            args=(i, self.folder_list[
+                                                     int(np.round(i * interval)): min(int(np.round((i + 1) * interval)),
+                                                                                      len(self.folder_list))],
+                                                  self.downsampling,
+                                                  self.inlier_percentage, self.visible_interval,
+                                                  queue_clean_point_list,
+                                                  queue_intrinsic_matrix, queue_point_cloud,
+                                                  queue_mask_boundary, queue_view_indexes_per_point,
+                                                  queue_selected_indexes,
+                                                  queue_visible_view_indexes,
+                                                  queue_extrinsics, queue_projection,
+                                                  queue_crop_positions,
+                                                  queue_estimated_scale)))
+
+            for t in process_pool:
+                t.start()
+
+            count = 0
+            for t in process_pool:
+                print("Waiting for {:d}th process to complete".format(count))
+                count += 1
+                while t.is_alive():
+                    while not queue_selected_indexes.empty():
+                        folder, selected_indexes = queue_selected_indexes.get()
+                        self.selected_indexes_per_seq[folder] = selected_indexes
+                    while not queue_visible_view_indexes.empty():
+                        folder, visible_view_indexes = queue_visible_view_indexes.get()
+                        self.visible_view_indexes_per_seq[folder] = visible_view_indexes
+                    while not queue_view_indexes_per_point.empty():
+                        folder, view_indexes_per_point = queue_view_indexes_per_point.get()
+                        self.view_indexes_per_point_per_seq[folder] = view_indexes_per_point
+                    while not queue_clean_point_list.empty():
+                        folder, clean_point_list = queue_clean_point_list.get()
+                        self.clean_point_list_per_seq[folder] = clean_point_list
+                    while not queue_intrinsic_matrix.empty():
+                        folder, intrinsic_matrix = queue_intrinsic_matrix.get()
+                        self.intrinsic_matrix_per_seq[folder] = intrinsic_matrix
+                    while not queue_extrinsics.empty():
+                        folder, extrinsics = queue_extrinsics.get()
+                        self.extrinsics_per_seq[folder] = extrinsics
+                    while not queue_projection.empty():
+                        folder, projection = queue_projection.get()
+                        self.projection_per_seq[folder] = projection
+                    while not queue_crop_positions.empty():
+                        folder, crop_positions = queue_crop_positions.get()
+                        self.crop_positions_per_seq[folder] = crop_positions
+                    while not queue_point_cloud.empty():
+                        folder, point_cloud = queue_point_cloud.get()
+                        self.point_cloud_per_seq[folder] = point_cloud
+                    while not queue_mask_boundary.empty():
+                        folder, mask_boundary = queue_mask_boundary.get()
+                        self.mask_boundary_per_seq[folder] = mask_boundary
+                    while not queue_estimated_scale.empty():
+                        folder, estiamted_scale = queue_estimated_scale.get()
+                        self.estimated_scale_per_seq[folder] = estiamted_scale
+                    t.join(timeout=1)
 
             while not queue_selected_indexes.empty():
                 folder, selected_indexes = queue_selected_indexes.get()
@@ -176,6 +228,26 @@ class SfMDataset(Dataset):
                 self.estimated_scale_per_seq[folder] = estimated_scale
             print("Pre-processing complete.")
 
+            with open(str(precompute_path), "wb") as f:
+                pickle.dump(
+                    [self.crop_positions_per_seq, self.selected_indexes_per_seq,
+                     self.visible_view_indexes_per_seq,
+                     self.point_cloud_per_seq, self.intrinsic_matrix_per_seq,
+                     self.mask_boundary_per_seq, self.view_indexes_per_point_per_seq, self.extrinsics_per_seq,
+                     self.projection_per_seq, self.clean_point_list_per_seq,
+                     self.downsampling, self.inlier_percentage,
+                     self.estimated_scale_per_seq],
+                    f, pickle.HIGHEST_PROTOCOL)
+        else:
+            with open(str(precompute_path), "rb") as f:
+                [self.crop_positions_per_seq, self.selected_indexes_per_seq,
+                 self.visible_view_indexes_per_seq,
+                 self.point_cloud_per_seq, self.intrinsic_matrix_per_seq,
+                 self.mask_boundary_per_seq, self.view_indexes_per_point_per_seq, self.extrinsics_per_seq,
+                 self.projection_per_seq, self.clean_point_list_per_seq,
+                 self.downsampling,
+                 self.inlier_percentage, self.estimated_scale_per_seq] = pickle.load(f)
+
     def __len__(self):
         if self.num_iter is None:
             return len(self.image_file_names)
@@ -186,10 +258,9 @@ class SfMDataset(Dataset):
         if self.phase == 'train' or self.phase == 'validation':
             while True:
                 img_file_name = self.image_file_names[idx % self.num_sample]
-                # Retrieve the folder path
+
                 folder = str(img_file_name.parent)
-                # Randomly pick one adjacent frame
-                # We assume the filename has 8 logits followed by ".jpg"
+
                 start_h, end_h, start_w, end_w = self.crop_positions_per_seq[folder]
                 pos, increment = utils.generating_pos_and_increment(idx=idx,
                                                                     visible_view_indexes=
@@ -206,7 +277,7 @@ class SfMDataset(Dataset):
                                            self.extrinsics_per_seq[folder][pos + increment]]
                 pair_projection_matrices = [self.projection_per_seq[folder][pos],
                                             self.projection_per_seq[folder][pos + increment]]
-                # print(pair_indexes, pair_projection_matrices)
+
                 pair_mask_imgs, pair_sparse_depth_imgs, pair_flow_mask_imgs, pair_flow_imgs = \
                     utils.get_torch_training_data(pair_extrinsics=pair_extrinsic_matrices,
                                                   pair_projections=
@@ -226,7 +297,8 @@ class SfMDataset(Dataset):
             # Read pair images with downsampling and cropping
             pair_imgs = utils.get_pair_color_imgs(prefix_seq=folder, pair_indexes=pair_indexes, start_h=start_h,
                                                   start_w=start_w,
-                                                  end_h=end_h, end_w=end_w, downsampling_factor=self.downsampling, rgb_mode=self.rgb_mode)
+                                                  end_h=end_h, end_w=end_w, downsampling_factor=self.downsampling,
+                                                  rgb_mode=self.rgb_mode)
 
             # Calculate relative motion between two frames
             relative_motion = np.matmul(pair_extrinsic_matrices[0], np.linalg.inv(pair_extrinsic_matrices[1]))
@@ -277,7 +349,6 @@ class SfMDataset(Dataset):
             mask_boundary[mask_boundary <= 0.9] = 0.0
             mask_boundary = mask_boundary.reshape((mask_boundary.shape[0], mask_boundary.shape[1], 1))
 
-            # Normalize
             color_img_1 = self.normalize(image=color_img_1)['image']
             color_img_2 = self.normalize(image=color_img_2)['image']
 

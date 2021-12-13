@@ -370,18 +370,15 @@ def generating_pos_and_increment(idx, visible_view_indexes, adjacent_range):
     return [visible_view_idx, increment]
 
 
-def get_pair_color_imgs(prefix_seq, pair_indexes, start_h, end_h, start_w, end_w, downsampling_factor, is_hsv,
+def get_pair_color_imgs(prefix_seq, pair_indexes, start_h, end_h, start_w, end_w, downsampling_factor,
                         rgb_mode):
     imgs = []
     for i in pair_indexes:
         img = cv2.imread(str(Path(prefix_seq) / "{:08d}.jpg".format(i)))
         downsampled_img = cv2.resize(img, (0, 0), fx=1. / downsampling_factor, fy=1. / downsampling_factor)
         downsampled_img = downsampled_img[start_h:end_h, start_w:end_w, :]
-        if is_hsv:
-            downsampled_img = cv2.cvtColor(downsampled_img, cv2.COLOR_BGR2HSV_FULL)
-        else:
-            if rgb_mode == "rgb":
-                downsampled_img = cv2.cvtColor(downsampled_img, cv2.COLOR_BGR2RGB)
+        if rgb_mode == "rgb":
+            downsampled_img = cv2.cvtColor(downsampled_img, cv2.COLOR_BGR2RGB)
         imgs.append(downsampled_img)
     height, width, channel = imgs[0].shape
     imgs = np.asarray(imgs, dtype=np.uint8)
@@ -733,6 +730,16 @@ def display_color_depth_sparse_flow_dense_flow(idx, step, writer, colors_1, pred
         writer.add_image(phase + '/Images/Sparse_Flow_' + str(idx), sparse_flows_display, step, dataformats="HWC")
         writer.add_image(phase + '/Images/Dense_Flow_' + str(idx), dense_flows_display, step, dataformats="HWC")
         return
+
+
+def get_filenames_from_frame_indexes(sequence_root, frame_index_array):
+    test_image_list = []
+    for index in frame_index_array:
+        temp = list(sequence_root.rglob('{:08d}.jpg'.format(index)))
+        if len(temp) != 0:
+            test_image_list.append(temp[0])
+    test_image_list.sort()
+    return test_image_list
 
 
 def quaternion_matrix(quaternion):

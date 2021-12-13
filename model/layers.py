@@ -213,7 +213,6 @@ class DepthWarpingLayer(torch.nn.Module):
 # Warping depth map in coordinate system 2 to coordinate system 1
 def _depth_warping(depth_maps_1, depth_maps_2, img_masks, translation_vectors, rotation_matrices,
                    intrinsic_matrices, epsilon):
-    # Generate a meshgrid for each depth map to calculate value
     # BxHxWxC
     depth_maps_1 = torch.mul(depth_maps_1, img_masks)
     depth_maps_2 = torch.mul(depth_maps_2, img_masks)
@@ -233,7 +232,6 @@ def _depth_warping(depth_maps_1, depth_maps_2, img_masks, translation_vectors, r
 
     ones_grid = torch.ones((1, height, width, 1), dtype=torch.float32).cuda()
 
-    # intrinsic_matrix_inverse = intrinsic_matrix.inverse()
     eye = torch.eye(3).float().cuda().reshape(1, 3, 3).expand(intrinsic_matrices.shape[0], -1, -1)
     intrinsic_matrices_inverse, _ = torch.solve(eye, intrinsic_matrices)
     rotation_matrices_inverse = rotation_matrices.transpose(1, 2)
@@ -250,11 +248,10 @@ def _depth_warping(depth_maps_1, depth_maps_2, img_masks, translation_vectors, r
         depth_maps_1,
         intermediate_result.narrow(dim=-1, start=2, length=1).reshape(-1, height,
                                                                       width, 1))
-    # expand operation doesn't allocate new memory (repeat does)
+
     depth_maps_2_calculate = torch.where(img_masks > 0.5, depth_maps_2_calculate, epsilon)
     depth_maps_2_calculate = torch.where(depth_maps_2_calculate > 0.0, depth_maps_2_calculate, epsilon)
 
-    # This is the source coordinate in coordinate system 2 but ordered in coordinate system 1 in order to warp image 2 to coordinate system 1
     u_2 = (W.reshape(-1, 3).narrow(dim=-1, start=0, length=1).reshape(-1, 1, 1, 1) + torch.mul(depth_maps_1,
                                                                                                intermediate_result.narrow(
                                                                                                    dim=-1, start=0,
