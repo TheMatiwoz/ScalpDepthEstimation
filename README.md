@@ -1,7 +1,8 @@
 # ScalpDepthEstimation
+![Application with depth map](app.png)
 
 Repository created for the purpose of realization of an engineering thesis, the topic of which is "An implementation of an algorithm for depth estimation from monocular video in medical applications". The project includes an implementation of the training phase, a model and an application. The training data consists of artificially generated scalp recordings and corresponding SfM reconstruction results. 
-The PyTorch framework was used to implement the model. A summary of the engineering work is presented below.
+The PyTorch framework was used to implement the model. A project inspired by a similar problem dealing with depth estimation in endoscopic video [EndosopyDepthEstimation](https://github.com/lppllppl920/EndoscopyDepthEstimation-Pytorch). An abstract of the engineering work is presented below.
 
 ## Abstarct
 
